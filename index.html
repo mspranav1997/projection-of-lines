@@ -1,0 +1,172 @@
+<!doctype html>
+<!--
+(c) PRANAV M S, CAPE College, Punnapra. All rights reserved. See LICENSE.
+-->
+<html lang="en"><head><meta charset="utf-8">
+<title>Projection of Lines – 3D Visualiser</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+:root{--bg:#eef2f6;--pn:#fff;--tx:#14213d;--mu:#5b6779;--bd:#cfd8e3;--ln:#d6336c;--fv:#1c64f2;--tv:#13875b;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1620;--pn:#18212d;--tx:#e6ecf4;--mu:#93a1b5;--bd:#2c3a4c;--ln:#ff6b9a;--fv:#6ea2ff;--tv:#4cd49b}}
+:root[data-theme="dark"]{--bg:#0f1620;--pn:#18212d;--tx:#e6ecf4;--mu:#93a1b5;--bd:#2c3a4c;--ln:#ff6b9a;--fv:#6ea2ff;--tv:#4cd49b}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--tx);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+[hidden]{display:none!important}
+#app{display:flex;flex-direction:column;height:100%}
+aside{background:var(--pn);border-bottom:1px solid var(--bd);padding:12px 14px;overflow:auto;max-height:50%;flex:0 0 auto}
+main{flex:1;position:relative;min-height:0}
+@media(min-width:840px){#app{flex-direction:row}aside{width:340px;max-height:none;border-bottom:0;border-right:1px solid var(--bd)}}
+h1{font-size:17px;margin:0 0 2px;letter-spacing:-.01em}
+h2{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--mu);margin:12px 0 6px;font-weight:600}
+.sub{color:var(--mu);margin:0 0 10px;font-size:12.5px}
+button{font:inherit;color:var(--tx);background:var(--bg);border:1px solid var(--bd);border-radius:6px;padding:6px 10px;cursor:pointer}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--fv);outline-offset:1px}
+.seg{display:flex;gap:6px;margin-bottom:6px}.seg button{flex:1}.seg button.on{background:var(--tx);color:var(--pn);border-color:var(--tx)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+#f label{display:flex;flex-direction:column;font-size:12px;color:var(--mu);gap:2px}
+#f input,#f select{font:inherit;color:var(--tx);background:var(--bg);border:1px solid var(--bd);border-radius:5px;padding:5px 6px;width:100%;box-sizing:border-box}
+.chk{display:block;font-size:12.5px;margin-top:12px}
+#st{font-size:12.5px;margin:8px 0;color:var(--mu)}#st.bad{color:var(--ln)}
+table{width:100%;border-collapse:collapse;margin-top:8px;font-size:13px}
+td{padding:3px 0;border-bottom:1px solid var(--bd)}td:last-child{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+.key{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 4px;font-size:12px;color:var(--mu)}
+.key i{display:inline-block;width:18px;height:4px;border-radius:2px;vertical-align:middle;margin-right:4px}
+#sv{width:100%;max-width:300px;display:block;margin:6px auto 0;color:var(--mu);overflow:visible}
+#v{position:absolute;inset:0;touch-action:none;cursor:grab;overflow:hidden;overscroll-behavior:none;contain:strict}
+#v canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+#bar{position:absolute;top:10px;right:10px;display:flex;gap:6px}
+#tip{position:absolute;left:12px;bottom:10px;color:var(--mu);font-size:12.5px;pointer-events:none;max-width:54%}
+#wm{position:absolute;right:12px;bottom:10px;max-width:40%;text-align:right;color:var(--mu);opacity:.65;font-size:11px;letter-spacing:.02em;pointer-events:none;user-select:none}
+</style></head><body>
+<div id="app">
+<aside>
+<h1>Projection of a line</h1>
+<p class="sub">Enter any values that fix the line and leave the rest blank. <b>All lengths are in cm</b> (30 mm = 3 cm).</p>
+<div class="seg"><button data-tab="i" class="on">Inputs</button><button data-tab="r">Results</button></div>
+<section id="pi">
+<div id="f"></div>
+<label class="chk"><input type="checkbox" id="tr" checked> Show traces (HT, VT)</label>
+<p id="st"></p>
+<button id="clr">Clear all except end A</button>
+</section>
+<section id="pr" hidden>
+<div class="key"><span><i style="background:var(--ln)"></i>line</span><span><i style="background:var(--fv)"></i>front view (VP)</span><span><i style="background:var(--tv)"></i>top view (HP)</span><span><i style="background:#f08c00"></i>HT</span><span><i style="background:#9c36b5"></i>VT</span></div>
+<table id="out"></table>
+<svg id="sv" viewBox="0 0 220 230" aria-label="Orthographic drawing"></svg>
+</section>
+</aside>
+<main><div id="v"></div>
+<div id="bar"><button id="bF">Front view</button><button id="bT">Top view</button><button id="b3">3D view</button></div>
+<div id="tip">Drag to rotate. Click the blue plane (VP) or green plane (HP) to look straight at it.</div>
+<div id="wm">Made by Pranav MS, CAPE College, Punnapra</div></main>
+</div>
+<script src="lib/three.min.js"></script>
+<script>
+const $=s=>document.querySelector(s),R=Math.PI/180;
+const G=[['End A',[['hA','Height above HP (cm)',2],['dA','Distance from VP (cm)',3]]],['End B (optional)',[['hB','Height above HP (cm)',''],['dB','Distance from VP (cm)','']]],['Lengths (cm)',[['L','True length',10],['F','Front view length',''],['T','Top view length',''],['X','Gap between projectors','']]],['Angles (°)',[['th','θ  line to HP',30],['ph','φ  line to VP',30],['al','α  front view to XY',''],['be','β  top view to XY','']]]];
+const box=$('#f');
+G.forEach(([t,fs])=>box.insertAdjacentHTML('beforeend',`<h2>${t}</h2><div class="grid">`+fs.map(([id,l,v])=>`<label>${l}<input id="${id}" type="number" step="any" value="${v}"></label>`).join('')+'</div>'));
+box.insertAdjacentHTML('beforeend','<h2>If end B is not entered</h2><div class="grid"><label>B height compared with A<select id="vh"><option value="1">higher</option><option value="-1">lower</option></select></label><label>B distance from VP<select id="vd"><option value="1">more than A</option><option value="-1">less than A</option></select></label></div>');
+document.querySelectorAll('.seg button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.seg button').forEach(x=>x.classList.toggle('on',x===b));$('#pi').hidden=b.dataset.tab!='i';$('#pr').hidden=b.dataset.tab!='r'});
+$('#pi').addEventListener('input',()=>update());
+$('#clr').onclick=()=>{box.querySelectorAll('input').forEach(i=>{if(i.id!='hA'&&i.id!='dA')i.value=''});update()};
+
+/* ---- 3D scene ---- */
+const el=$('#v'),ren=new THREE.WebGLRenderer({antialias:true,alpha:true});
+ren.setPixelRatio(Math.min(devicePixelRatio,1.5));el.appendChild(ren.domElement);
+const scene=new THREE.Scene(),cam=new THREE.PerspectiveCamera(40,1,.1,200);
+const pivot=new THREE.Group(),inner=new THREE.Group(),dyn=new THREE.Group();
+inner.position.set(-8,-2,-2);pivot.add(inner);inner.add(dyn);scene.add(pivot);
+const P=(x,h,d)=>new THREE.Vector3(x,h,d);
+function plane(w,hh,pos,rotX,col){const g=new THREE.PlaneGeometry(w,hh),m=new THREE.Mesh(g,new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:.2,side:THREE.DoubleSide,depthWrite:false}));
+ m.add(new THREE.LineSegments(new THREE.EdgesGeometry(g),new THREE.LineBasicMaterial({color:col})));m.position.copy(pos);m.rotation.x=rotX;inner.add(m);return m}
+const vp=plane(16,20,P(8,2,0),0,0x1c64f2),hp=plane(16,20,P(8,0,2),-Math.PI/2,0x13875b);
+function cyl(p,q,r,col){const d=new THREE.Vector3().subVectors(q,p),len=d.length();if(len<1e-6)return new THREE.Object3D();
+ const m=new THREE.Mesh(new THREE.CylinderGeometry(r,r,len,10),new THREE.MeshBasicMaterial({color:col}));
+ m.position.copy(p).addScaledVector(d,.5);m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),d.normalize());return m}
+function dl(p,q,col){const l=new THREE.Line(new THREE.BufferGeometry().setFromPoints([p,q]),new THREE.LineDashedMaterial({color:col,dashSize:.3,gapSize:.22}));l.computeLineDistances();return l}
+function lab(t,col,pos,s=3){const c=document.createElement('canvas');c.width=128;c.height=64;const x=c.getContext('2d');x.font='bold 40px system-ui,sans-serif';x.fillStyle=col;x.textAlign='center';x.textBaseline='middle';x.fillText(t,64,34);
+ const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),depthTest:false,transparent:true}));sp.scale.set(s,s/2,1);sp.position.copy(pos);return sp}
+inner.add(cyl(P(0,0,0),P(16,0,0),.05,0x8a94a6),lab('X   Y','#8a94a6',P(17.3,0,0),2.6));
+inner.add(lab('VP','#1c64f2',P(1,11,0),2.6),lab('HP','#13875b',P(1,0,11),2.6));
+[['I',13,5,5],['II',13,5,-5],['III',13,-5,-5],['IV',13,-5,5]].forEach(([t,x,h,d])=>inner.add(lab(t,'#8a94a6',P(x,h,d),2.2)));
+function draw(xA,hA,dA,xB,hB,dB){
+ dyn.clear();const A=P(xA,hA,dA),B=P(xB,hB,dB),a=P(xA,0,dA),b=P(xB,0,dB),a1=P(xA,hA,0),b1=P(xB,hB,0);
+ dyn.add(cyl(A,B,.11,0xd6336c),cyl(a,b,.08,0x13875b),cyl(a1,b1,.08,0x1c64f2));
+ [[A,a],[A,a1],[B,b],[B,b1]].forEach(([p,q])=>dyn.add(dl(p,q,0x8a94a6)));
+ const up=(v,o)=>v.clone().add(P(0,o,0));
+ dyn.add(lab('A','#d6336c',up(A,1)),lab('B','#d6336c',up(B,1)),lab('a','#13875b',up(a,.9),2.4),lab('b','#13875b',up(b,.9),2.4),lab("a′",'#1c64f2',up(a1,.9),2.4),lab("b′",'#1c64f2',up(b1,.9),2.4))}
+function trace3(A,B,t,p,col,name){if(!p||Math.hypot(p.x,p.h,p.d)>60)return;
+ const T=P(p.x,p.h,p.d),m=new THREE.Mesh(new THREE.SphereGeometry(.24,16,12),new THREE.MeshBasicMaterial({color:col}));m.position.copy(T);dyn.add(m);
+ if(t<0)dyn.add(dl(A,T,0xd6336c));else if(t>1)dyn.add(dl(B,T,0xd6336c));
+ dyn.add(lab(name,'#'+col.toString(16).padStart(6,'0'),T.clone().add(P(0,1,0)),2.4))}
+
+/* ---- rotation ---- */
+const rot={x:.45,y:-.6};let tgt=null;
+const go=(x,y)=>{rot.x=Math.atan2(Math.sin(rot.x),Math.cos(rot.x));rot.y=Math.atan2(Math.sin(rot.y),Math.cos(rot.y));tgt={x,y}};
+$('#bF').onclick=()=>go(0,0);$('#bT').onclick=()=>go(Math.PI/2,0);$('#b3').onclick=()=>go(.45,-.6);
+let down=null;const cv=ren.domElement;
+cv.addEventListener('pointerdown',e=>{down={x:e.clientX,y:e.clientY,sx:e.clientX,sy:e.clientY};cv.setPointerCapture(e.pointerId);cv.style.cursor='grabbing'});
+cv.addEventListener('pointermove',e=>{if(!down)return;rot.y+=(e.clientX-down.x)*.008;rot.x+=(e.clientY-down.y)*.008;down.x=e.clientX;down.y=e.clientY;tgt=null});
+cv.addEventListener('pointercancel',()=>{down=null});
+cv.addEventListener('pointerup',e=>{cv.style.cursor='grab';if(!down)return;
+ if(Math.hypot(e.clientX-down.sx,e.clientY-down.sy)<5){const r=cv.getBoundingClientRect(),rc=new THREE.Raycaster();
+  rc.setFromCamera(new THREE.Vector2(((e.clientX-r.left)/r.width)*2-1,-((e.clientY-r.top)/r.height)*2+1),cam);
+  const h=rc.intersectObjects([vp,hp])[0];if(h)h.object===vp?go(0,0):go(Math.PI/2,0)}
+ down=null});
+let lw=0,lh=0,need=true,lx=null,ly=null;
+function size(){const w=el.clientWidth,h=el.clientHeight;if(!w||!h||(w===lw&&h===lh))return;lw=w;lh=h;ren.setSize(w,h,false);need=true;cam.aspect=w/h;cam.position.z=cam.aspect<1?32/cam.aspect*.9:32;cam.updateProjectionMatrix()}
+new ResizeObserver(size).observe(el);size();
+(function loop(){if(tgt){rot.x+=(tgt.x-rot.x)*.14;rot.y+=(tgt.y-rot.y)*.14;if(Math.abs(tgt.x-rot.x)+Math.abs(tgt.y-rot.y)<.002){rot.x=tgt.x;rot.y=tgt.y;tgt=null}}
+ if(rot.x!==lx||rot.y!==ly||need){lx=rot.x;ly=rot.y;need=false;try{pivot.rotation.set(rot.x,rot.y,0);ren.render(scene,cam)}catch(e){console.error(e)}}requestAnimationFrame(loop)})();
+
+/* ---- solver: X=gap, H=|height diff|, D=|distance diff|, L, F=front length, T=top length ---- */
+const q2=Math.sqrt,Sn=Math.sin,Cs=Math.cos,Tn=Math.tan,At=Math.atan2;
+const RU=[
+['L',['X','H','D'],(X,H,D)=>q2(X*X+H*H+D*D)],['D',['L','F'],(L,F)=>q2(L*L-F*F)],['H',['L','T'],(L,T)=>q2(L*L-T*T)],['F',['X','H'],Math.hypot],['T',['X','D'],Math.hypot],
+['X',['F','H'],(F,H)=>q2(F*F-H*H)],['X',['T','D'],(T,D)=>q2(T*T-D*D)],['X',['L','H','D'],(L,H,D)=>q2(L*L-H*H-D*D)],
+['X',['L','al','be'],(L,a,b)=>L/q2(1+Tn(a)**2+Tn(b)**2)],['X',['H','al'],(H,a)=>H/Tn(a)],['X',['D','be'],(D,b)=>D/Tn(b)],['X',['F','al'],(F,a)=>F*Cs(a)],['X',['T','be'],(T,b)=>T*Cs(b)],
+['H',['F','X'],(F,X)=>q2(F*F-X*X)],['H',['L','X','D'],(L,X,D)=>q2(L*L-X*X-D*D)],['H',['L','th'],(L,t)=>L*Sn(t)],['H',['X','al'],(X,a)=>X*Tn(a)],['H',['F','al'],(F,a)=>F*Sn(a)],['H',['T','th'],(T,t)=>T*Tn(t)],
+['D',['T','X'],(T,X)=>q2(T*T-X*X)],['D',['L','X','H'],(L,X,H)=>q2(L*L-X*X-H*H)],['D',['L','ph'],(L,p)=>L*Sn(p)],['D',['X','be'],(X,b)=>X*Tn(b)],['D',['T','be'],(T,b)=>T*Sn(b)],['D',['F','ph'],(F,p)=>F*Tn(p)],
+['L',['F','ph'],(F,p)=>F/Cs(p)],['L',['T','th'],(T,t)=>T/Cs(t)],['L',['H','th'],(H,t)=>H/Sn(t)],['L',['D','ph'],(D,p)=>D/Sn(p)],
+['F',['L','ph'],(L,p)=>L*Cs(p)],['F',['X','al'],(X,a)=>X/Cs(a)],['F',['H','al'],(H,a)=>H/Sn(a)],
+['T',['L','th'],(L,t)=>L*Cs(t)],['T',['X','be'],(X,b)=>X/Cs(b)],['T',['D','be'],(D,b)=>D/Sn(b)],
+['th',['H','L'],(H,L)=>Math.asin(H/L)],['th',['H','T'],At],['th',['T','L'],(T,L)=>Math.acos(T/L)],
+['ph',['D','L'],(D,L)=>Math.asin(D/L)],['ph',['D','F'],At],['ph',['F','L'],(F,L)=>Math.acos(F/L)],
+['al',['H','X'],At],['be',['D','X'],At]];
+const NM={L:'true length',F:'front view length',T:'top view length',X:'gap',H:'B height',D:'B distance',th:'θ',ph:'φ',al:'α',be:'β'};
+const q=(h,d)=>h>=0?(d>=0?'I':'II'):(d>=0?'IV':'III');
+function update(){
+ const I={};['hA','dA','hB','dB','L','F','T','X','th','ph','al','be'].forEach(k=>{const s=$('#'+k).value.trim();I[k]=s===''||isNaN(+s)?null:+s});
+ const hA=I.hA??0,dA=I.dA??0,ab=x=>x==null?null:Math.abs(x),an=x=>x==null?null:Math.min(Math.abs(x),89.99)*R;
+ const v={L:ab(I.L),F:ab(I.F),T:ab(I.T),X:ab(I.X),th:an(I.th),ph:an(I.ph),al:an(I.al),be:an(I.be),H:I.hB==null?null:Math.abs(I.hB-hA),D:I.dB==null?null:Math.abs(I.dB-dA)};
+ const v0={...v},st=$('#st');
+ for(let i=0;i<12;i++){let ch=false;for(const[t,d,f]of RU)if(v[t]==null&&d.every(k=>v[k]!=null)){const r=f(...d.map(k=>v[k]));if(isFinite(r)){v[t]=r;ch=true}}if(!ch)break}
+ if(v.X==null||v.H==null||v.D==null){dyn.clear();need=true;$('#out').innerHTML='';$('#sv').innerHTML='';st.className='bad';
+  st.textContent=(v0.th!=null&&v0.ph!=null&&v0.th+v0.ph>Math.PI/2+1e-9)?'θ + φ cannot be more than 90°.':'Not enough data yet, or the values cannot form a line. Add more values (for example L, θ and φ, or both ends and the gap).';return}
+ const f=x=>x.toFixed(1),{X,H,D}=v,L=Math.hypot(X,H,D),FV=Math.hypot(X,H),TV=Math.hypot(X,D),k=L||1;
+ const th=Math.asin(H/k)/R,ph=Math.asin(D/k)/R,al=Math.atan2(H,X)/R,be=Math.atan2(D,X)/R;
+ const bad=[['L',L],['F',FV],['T',TV],['X',X],['H',H],['D',D]].filter(([n,c])=>v0[n]!=null&&Math.abs(v0[n]-c)>.05).concat([['th',th],['ph',ph],['al',al],['be',be]].filter(([n,c])=>v0[n]!=null&&Math.abs(v0[n]/R-c)>.05)).map(x=>NM[x[0]]);
+ st.className=bad.length?'bad':'';st.textContent=bad.length?'These values disagree with each other: '+bad.join(', ')+'. The line shown uses the first consistent set.':'Line solved. Open the Results tab for all values.'+(['hA','dA','hB','dB','L','F','T','X'].some(i=>Math.abs(+$('#'+i).value)>25)?' Some values are above 25 cm. Lengths are in cm, so if you typed mm, divide by 10.':'');
+ const sh=I.hB!=null?(I.hB>=hA?1:-1):+$('#vh').value,sd=I.dB!=null?(I.dB>=dA?1:-1):+$('#vd').value,hB=hA+sh*H,dB=dA+sd*D,dh=hB-hA,dd=dB-dA;
+ const tH=Math.abs(dh)>1e-6?-hA/dh:null,tV=Math.abs(dd)>1e-6?-dA/dd:null,Hp=tH===null?null:{x:2+tH*X*1,d:dA+tH*dd},Vp=tV===null?null:{x:2+tV*X,h:hA+tV*dh};
+ const rows=[['True length (cm)',f(L)],['θ  (line to HP)',f(th)+'°'],['φ  (line to VP)',f(ph)+'°'],['Front view length (cm)',f(FV)],['Top view length (cm)',f(TV)],['α  (front view to XY)',f(al)+'°'],['β  (top view to XY)',f(be)+'°'],['A: height / distance (cm)',f(hA)+' / '+f(dA)],['B: height / distance (cm)',f(hB)+' / '+f(dB)],['Gap between projectors (cm)',f(X)],['A / B in quadrant',q(hA,dA)+' / '+q(hB,dB)],['HT: distance from VP (cm)',Hp?f(Hp.d):'none (line parallel to HP)'],['VT: height above HP (cm)',Vp?f(Vp.h):'none (line parallel to VP)']];
+ $('#out').innerHTML=rows.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('');
+ const xA=2,xB=2+X;draw(xA,hA,dA,xB,hB,dB);need=true;
+ if($('#tr').checked){const A3=P(xA,hA,dA),B3=P(xB,hB,dB);trace3(A3,B3,tH,Hp&&{x:Hp.x,h:0,d:Hp.d},0xf08c00,'HT');trace3(A3,B3,tV,Vp&&{x:Vp.x,h:Vp.h,d:0},0x9c36b5,'VT')}
+ const S=9,Y0=112,Xp=v=>14+v*S,Fy=h=>Y0-h*S,Ty=d=>Y0+d*S,t=(x,y,s,c)=>`<text x="${x+3}" y="${y-3}" font-size="10" fill="${c}">${s}</text>`;
+ const pr=(x,y1,y2)=>`<line x1="${Xp(x)}" x2="${Xp(x)}" y1="${y1}" y2="${y2}" stroke="currentColor" stroke-width=".7" stroke-dasharray="3 2"/>`;
+ $('#sv').innerHTML=`<text x="2" y="${Y0-3}" font-size="9" fill="currentColor">X</text><text x="208" y="${Y0+10}" font-size="9" fill="currentColor">Y</text>`+pr(xA,Fy(hA),Ty(dA))+pr(xB,Fy(hB),Ty(dB))+
+  `<line x1="${Xp(xA)}" y1="${Fy(hA)}" x2="${Xp(xB)}" y2="${Fy(hB)}" stroke="#1c64f2" stroke-width="2.2"/><line x1="${Xp(xA)}" y1="${Ty(dA)}" x2="${Xp(xB)}" y2="${Ty(dB)}" stroke="#13875b" stroke-width="2.2"/>`+
+  t(Xp(xA),Fy(hA),'a′','#1c64f2')+t(Xp(xB),Fy(hB),'b′','#1c64f2')+t(Xp(xA),Ty(dA),'a','#13875b')+t(Xp(xB),Ty(dB),'b','#13875b');
+ const ok=p=>p&&Math.hypot(p.x,p.h||0,p.d||0)<=60,xs=[0,220,Xp(xA),Xp(xB)],ys=[0,230,Fy(hA),Fy(hB),Ty(dA),Ty(dB)];let s='';
+ if($('#tr').checked){const ln=(a,b,c)=>`<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="${c}" stroke-width="1.4" stroke-dasharray="4 3"/>`,
+  fa=[Xp(xA),Fy(hA)],fb=[Xp(xB),Fy(hB)],ta=[Xp(xA),Ty(dA)],tb=[Xp(xB),Ty(dB)],
+  tr2=(p,tt,f,tp,nf,nt,c)=>{xs.push(f[0]);ys.push(f[1],tp[1]);s+=(tt<0?ln(fa,f,'#1c64f2')+ln(ta,tp,'#13875b'):tt>1?ln(fb,f,'#1c64f2')+ln(tb,tp,'#13875b'):'')+pr(p.x,f[1],tp[1])+[f,tp].map(z=>`<circle cx="${z[0]}" cy="${z[1]}" r="2.6" fill="${c}"/>`).join('')+t(f[0],f[1],nf,c)+t(tp[0],tp[1],nt,c)};
+  if(ok(Hp))tr2(Hp,tH,[Xp(Hp.x),Y0],[Xp(Hp.x),Ty(Hp.d)],'h′','H','#f08c00');
+  if(ok(Vp))tr2(Vp,tV,[Xp(Vp.x),Fy(Vp.h)],[Xp(Vp.x),Y0],'V′','v','#9c36b5')}
+ const x0=Math.min(...xs)-10,x1=Math.max(...xs)+10,y0=Math.min(...ys)-10,y1=Math.max(...ys)+10;
+ $('#sv').setAttribute('viewBox',`${x0} ${y0} ${x1-x0} ${y1-y0}`);
+ $('#sv').insertAdjacentHTML('beforeend',s+`<line x1="${x0}" x2="${x1}" y1="${Y0}" y2="${Y0}" stroke="currentColor"/>`)}
+update();
+</script></body></html>
